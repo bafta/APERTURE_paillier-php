@@ -1,0 +1,11 @@
+[package]
+name = "paillier-php"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libpaillier = "0.6.0"
+ext-php-rs = "*"

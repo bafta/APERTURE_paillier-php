@@ -24,9 +24,9 @@ pub fn generate_keys() -> Result<HashMap<String, Binary<u8>>, &'static str> {
 /// @param string $msg The binary string to be encrypted
 /// @return string The encrypted ciphertext
 #[php_function]
-pub fn encrypt(encryption_key: Binary<u8>, msg: Binary<u8>) -> Result<Binary<u8>, &'static str> {
-    let Ok(ek) = EncryptionKey::from_bytes(encryption_key.to_vec()) else { return Err("Bad encryption key") };
-    let Some((ciphertext, _)) = ek.encrypt(msg.to_vec(), None) else { return Err("Failed to encrypt") };
+pub fn encrypt(encryption_key: Binary<u8>, msg: Binary<u8>) -> Result<Binary<u8>, String> {
+    let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
+    let Some((ciphertext, _)) = ek.encrypt(msg.to_vec(), None) else { return Err("Failed to encrypt".to_string()) };
     Ok(ciphertext.to_bytes().into_iter().collect::<Binary<_>>())
 }
 
@@ -35,10 +35,10 @@ pub fn encrypt(encryption_key: Binary<u8>, msg: Binary<u8>) -> Result<Binary<u8>
 /// @param string $ct_data The binary ciphertext string to be decrypted
 /// @return string The decrypted plaintext
 #[php_function]
-pub fn decrypt(decryption_key: Binary<u8>, ct_data: Binary<u8>) -> Result<Binary<u8>, &'static str> {
-    let Ok(dk) = DecryptionKey::from_bytes(decryption_key.to_vec()) else { return Err("Bad decryption key") };
+pub fn decrypt(decryption_key: Binary<u8>, ct_data: Binary<u8>) -> Result<Binary<u8>, String> {
+    let dk = DecryptionKey::from_bytes(decryption_key.to_vec())?;
     let ciphertext = Ciphertext::from_slice(ct_data.to_vec());
-    let Some(plaintext) = dk.decrypt(&ciphertext) else { return Err("Failed to decrypt") };
+    let Some(plaintext) = dk.decrypt(&ciphertext) else { return Err("Failed to decrypt".to_string()) };
     Ok(plaintext.into_iter().collect::<Binary<_>>())
 }
 

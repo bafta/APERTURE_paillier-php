@@ -19,14 +19,26 @@ pub fn generate_keys() -> Result<HashMap<String, Binary<u8>>, &'static str> {
     Ok(keys)
 }
 
+#[derive(ZvalConvert)]
+pub enum MsgType<'a> {
+    Int(i64),
+    Str(&'a str),
+    None
+}
+
 /// Encrypt a message
 /// @param string $encryption_key Binary string containing the encryption key
-/// @param string $msg The binary string to be encrypted
+/// @param string $msg The int or string to be encrypted
 /// @return string The encrypted ciphertext
 #[php_function]
-pub fn encrypt(encryption_key: Binary<u8>, msg: Binary<u8>) -> Result<Binary<u8>, String> {
+pub fn encrypt(encryption_key: Binary<u8>, msg: MsgType) -> Result<Binary<u8>, String> {
+    let msg_data = match msg {
+        MsgType::Int(int_val) => &(int_val.to_ne_bytes()),
+        MsgType::Str(str_val) => str_val.as_bytes(),
+        MsgType::None => return Err("Bad type".to_string()),
+    };
     let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
-    let Some((ciphertext, _)) = ek.encrypt(msg.to_vec(), None) else { return Err("Failed to encrypt".to_string()) };
+    let Some((ciphertext, _)) = ek.encrypt(msg_data, None) else { return Err("Failed to encrypt".to_string()) };
     Ok(ciphertext.to_bytes().into_iter().collect::<Binary<_>>())
 }
 

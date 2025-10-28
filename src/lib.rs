@@ -19,7 +19,7 @@ pub fn generate_keys() -> Result<HashMap<String, Binary<u8>>, &'static str> {
     Ok(keys)
 }
 
-#[derive(ZvalConvert)]
+#[derive(ZvalConvert, Clone)]
 pub enum MsgType<'a> {
     Int(i64),
     Str(&'a str),
@@ -32,12 +32,31 @@ pub enum MsgType<'a> {
 /// @return string The encrypted ciphertext
 #[php_function]
 pub fn encrypt(encryption_key: Binary<u8>, msg: MsgType) -> Result<Binary<u8>, String> {
+    let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
+    encrypt_msg(&ek, &msg)
+}
+
+/// Encrypt an array of messages
+/// @param string $encryption_key Binary string containing the encryption key
+/// @param string $msgs The array of ints or strings to be encrypted
+/// @return string[] The encrypted ciphertext, keys are preserved
+#[php_function]
+pub fn encrypt_array(encryption_key: Binary<u8>, msgs: HashMap<String, MsgType>) -> Result<HashMap<String, Binary<u8>>, String> {
+    let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
+    let mut encrypted: HashMap<String, Binary<u8>> = HashMap::new();
+    for (key, msg) in msgs.iter() {
+        encrypted.insert(key.clone(), encrypt_msg(&ek, msg)?);
+    }
+
+    Ok(encrypted)
+}
+
+fn encrypt_msg(ek: &EncryptionKey, msg: &MsgType) -> Result<Binary<u8>, String> {
     let msg_data = match msg {
         MsgType::Int(int_val) => &(int_val.to_ne_bytes()),
         MsgType::Str(str_val) => str_val.as_bytes(),
         MsgType::None => return Err("Bad type".to_string()),
     };
-    let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
     let Some((ciphertext, _)) = ek.encrypt(msg_data, None) else { return Err("Failed to encrypt".to_string()) };
     Ok(ciphertext.to_bytes().into_iter().collect::<Binary<_>>())
 }
@@ -80,6 +99,7 @@ pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
     module
         .function(wrap_function!(generate_keys))
         .function(wrap_function!(encrypt))
+        .function(wrap_function!(encrypt_array))
         .function(wrap_function!(decrypt))
         .function(wrap_function!(add))
         .info_function(php_module_info)

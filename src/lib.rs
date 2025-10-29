@@ -1,8 +1,6 @@
-/**
- * Thin wrapper over Paillier-rs to make it a PHP module
- * Install the dev environment following the instrictions here... https://ext-php.rs/getting-started/installation.html
- * Paillier-rs docs https://crates.io/crates/libpaillier
- */
+/// Thin wrapper over Paillier-rs to make it a PHP module
+/// Install the dev environment following the instructions here... https://ext-php.rs/getting-started/installation.html
+/// Paillier-rs docs https://crates.io/crates/libpaillier
 use std::collections::HashMap;
 use ext_php_rs::{info_table_end, info_table_row, info_table_start, prelude::*, zend::ModuleEntry, binary::Binary};
 use libpaillier::{Ciphertext, DecryptionKey, EncryptionKey};

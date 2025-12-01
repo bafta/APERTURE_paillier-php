@@ -115,16 +115,37 @@ fn decrypt_ciphertext(dk: &DecryptionKey, ct_data: &Binary<u8>, return_as: Optio
 
 /// Paillier add two ciphertexts
 /// @param string $encryption_key Binary string containing the encryption key
-/// @param string ct1_data Binary string of the first operand
-/// @param string ct2_data Binary string of the second operand
+/// @param string $ct1_data Binary string of the first operand
+/// @param string $ct2_data Binary string of the second operand
 /// @return string The encrypted result of the addition
 #[php_function]
 pub fn add(encryption_key: Binary<u8>, ct1_data: Binary<u8>, ct2_data: Binary<u8>) -> Result<Binary<u8>, &'static str> {
     let Ok(ek) = EncryptionKey::from_bytes(encryption_key.to_vec()) else { return Err("Bad encryption key") };
     let ciphertext1 = Ciphertext::from_slice(ct1_data.to_vec());
     let ciphertext2 = Ciphertext::from_slice(ct2_data.to_vec());
-    let Some(sum) = ek.add(&ciphertext1, &ciphertext2) else { return Err("Add failed") };
+    let sum = add_ciphertexts(&ek, &ciphertext1, &ciphertext2)?;
     Ok(sum.to_bytes().into_iter().collect::<Binary<_>>())
+}
+
+/// Paillier add all ciphertexts in an array
+/// @param string $encryption_key Binary string containing the encryption key
+/// @param string[] $ciphertext_data Array of ciphertexts to add
+/// @return string The encrypted result of the addition
+#[php_function]
+pub fn add_array(encryption_key: Binary<u8>, ciphertext_data: HashMap<String, Binary<u8>>) -> Result<Binary<u8>, &'static str> {
+    let Ok(ek) = EncryptionKey::from_bytes(encryption_key.to_vec()) else { return Err("Bad encryption key") };
+    let Some((mut enc_total, _)) = ek.encrypt(&(0_i32.to_ne_bytes()), None) else { return Err("Failed to encrypt starting value") };
+    for (_, ct_data) in ciphertext_data.iter() {
+        let ciphertext = Ciphertext::from_slice(ct_data.to_vec());
+        enc_total = add_ciphertexts(&ek, &enc_total, &ciphertext)?;
+    }
+
+    Ok(enc_total.to_bytes().into_iter().collect::<Binary<_>>())
+}
+
+fn add_ciphertexts(ek: &EncryptionKey, ciphertext1: &Ciphertext, ciphertext2: &Ciphertext) -> Result<Ciphertext, &'static str> {
+    let Some(sum) = ek.add(&ciphertext1, &ciphertext2) else { return Err("Add failed") };
+    Ok(sum)
 }
 
 pub extern "C" fn php_module_info(_module: *mut ModuleEntry) {

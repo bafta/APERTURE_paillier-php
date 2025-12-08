@@ -7,7 +7,7 @@ use libpaillier::{Ciphertext, DecryptionKey, EncryptionKey};
 
 #[derive(ZvalConvert, PartialEq, Debug)]
 pub enum MsgResultType {
-    Int(u64),
+    Int(i64),
     Str(String),
     None
 }
@@ -106,7 +106,7 @@ fn decrypt_ciphertext(dk: &DecryptionKey, ciphertext: &Ciphertext, return_as: Op
                 plaintext.insert(0, 0);
             }
             let Ok(byte_array) = <[u8; 8]>::try_from(plaintext.as_slice()) else { return Err("Could not convert value to int".to_string()) };
-            Ok(MsgResultType::Int(u64::from_be_bytes(byte_array)))
+            Ok(MsgResultType::Int(i64::from_be_bytes(byte_array)))
         },
         "STRING" => {
             let Ok(plaintext_str) = String::from_utf8(plaintext) else { return Err("Could not convert value to string".to_string()) };
@@ -195,7 +195,7 @@ mod tests {
         let Ok(dk) = DecryptionKey::from_bytes(dk_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
 
         let mut rng = rand::rng();
-        let plain_val = rng.random::<u32>() as u64;
+        let plain_val = rng.random::<u32>() as i64;
         let enc_val = encrypt_msg(&ek, &MsgResultType::Int(plain_val))?;
         let dec_val = decrypt_ciphertext(&dk, &enc_val, None)?;
         assert_eq!(MsgResultType::Int(plain_val), dec_val);
@@ -211,8 +211,8 @@ mod tests {
         let Ok(dk) = DecryptionKey::from_bytes(dk_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
 
         let mut rng = rand::rng();
-        let plain1 = rng.random::<u32>() as u64;
-        let plain2 = rng.random::<u32>() as u64;
+        let plain1 = rng.random::<u32>() as i64;
+        let plain2 = rng.random::<u32>() as i64;
         let plain_sum = plain1 + plain2;
 
         let enc1 = encrypt_msg(&ek, &MsgResultType::Int(plain1))?;

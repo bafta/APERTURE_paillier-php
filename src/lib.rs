@@ -60,7 +60,7 @@ pub fn encrypt_array(encryption_key: Binary<u8>, msgs: HashMap<String, MsgResult
 
 fn encrypt_msg(ek: &EncryptionKey, msg: &MsgResultType) -> Result<Ciphertext, String> {
     let msg_data = match msg {
-        MsgResultType::Int(int_val) => &(int_val.to_ne_bytes()),
+        MsgResultType::Int(int_val) => &(int_val.to_be_bytes()), // MUST be big-endian for paillier addition to work
         MsgResultType::Str(str_val) => str_val.as_bytes(),
         MsgResultType::None => return Err("Bad type".to_string()),
     };
@@ -101,8 +101,12 @@ fn decrypt_ciphertext(dk: &DecryptionKey, ciphertext: &Ciphertext, return_as: Op
     match return_type.as_str() {
         "INT" => {
             plaintext.truncate(8);
+            // plaintext may be fewer than 8 long due to leading 0's being trimmed -- add them back in
+            for _ in 0..(8 - plaintext.len()) {
+                plaintext.insert(0, 0);
+            }
             let Ok(byte_array) = <[u8; 8]>::try_from(plaintext.as_slice()) else { return Err("Could not convert value to int".to_string()) };
-            Ok(MsgResultType::Int(i64::from_ne_bytes(byte_array)))
+            Ok(MsgResultType::Int(u64::from_be_bytes(byte_array)))
         },
         "STRING" => {
             let Ok(plaintext_str) = String::from_utf8(plaintext) else { return Err("Could not convert value to string".to_string()) };

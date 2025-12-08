@@ -22,7 +22,7 @@ pub enum MsgResultType {
 /// Returns a randomly generated keypair
 /// @return array [0 => encryption_key, 1 => decryption_key, 'encryption_key' -> ..., 'decryption_key' => ...]
 #[php_function]
-pub fn generate_keys() -> Result<HashMap<String, Binary<u8>>, &'static str> {
+pub fn pal_generate_keys() -> Result<HashMap<String, Binary<u8>>, &'static str> {
     let Some(dk) = DecryptionKey::random() else { return Err("Failed to generate decryption key") };
     let ek = EncryptionKey::from(&dk);
     let mut keys = HashMap::new();
@@ -38,7 +38,7 @@ pub fn generate_keys() -> Result<HashMap<String, Binary<u8>>, &'static str> {
 /// @param string $msg The int or string to be encrypted
 /// @return string The encrypted ciphertext
 #[php_function]
-pub fn encrypt(encryption_key: Binary<u8>, msg: MsgResultType) -> Result<Binary<u8>, String> {
+pub fn pal_encrypt(encryption_key: Binary<u8>, msg: MsgResultType) -> Result<Binary<u8>, String> {
     let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
     Ok((encrypt_msg(&ek, &msg)?).to_bytes().into_iter().collect::<Binary<_>>())
 }
@@ -48,7 +48,7 @@ pub fn encrypt(encryption_key: Binary<u8>, msg: MsgResultType) -> Result<Binary<
 /// @param string|int[] $msgs Array of ints or strings to be encrypted
 /// @return string[] The encrypted ciphertext, keys are preserved
 #[php_function]
-pub fn encrypt_array(encryption_key: Binary<u8>, msgs: HashMap<String, MsgResultType>) -> Result<HashMap<String, Binary<u8>>, String> {
+pub fn pal_encrypt_array(encryption_key: Binary<u8>, msgs: HashMap<String, MsgResultType>) -> Result<HashMap<String, Binary<u8>>, String> {
     let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
     let mut encrypted: HashMap<String, Binary<u8>> = HashMap::new();
     for (key, msg) in msgs.iter() {
@@ -74,7 +74,7 @@ fn encrypt_msg(ek: &EncryptionKey, msg: &MsgResultType) -> Result<Ciphertext, St
 /// @param string $return_as Indicates what type to cast the returned data as, "INT" or "STRING", default "INT"
 /// @return string The decrypted plaintext
 #[php_function]
-pub fn decrypt(decryption_key: Binary<u8>, ct_data: Binary<u8>, return_as: Option<String>) -> Result<MsgResultType, String> {
+pub fn pal_decrypt(decryption_key: Binary<u8>, ct_data: Binary<u8>, return_as: Option<String>) -> Result<MsgResultType, String> {
     let dk = DecryptionKey::from_bytes(decryption_key.to_vec())?;
     decrypt_ciphertext(&dk, &Ciphertext::from_slice(ct_data.to_vec()), return_as)
 }
@@ -84,7 +84,7 @@ pub fn decrypt(decryption_key: Binary<u8>, ct_data: Binary<u8>, return_as: Optio
 /// @param string[] $ciphertext_data Array of binary strings to be decrypted
 /// @param string[] Indicates what type to cast the returned data with the same key, each value "INT" or "STRING", defaults to "INT" for any missing items
 #[php_function]
-pub fn decrypt_array(decryption_key: Binary<u8>, ciphertext_data: HashMap<String, Binary<u8>>, return_as: Option<HashMap<String, String>>) -> Result<HashMap<String, MsgResultType>, String> {
+pub fn pal_decrypt_array(decryption_key: Binary<u8>, ciphertext_data: HashMap<String, Binary<u8>>, return_as: Option<HashMap<String, String>>) -> Result<HashMap<String, MsgResultType>, String> {
     let dk = DecryptionKey::from_bytes(decryption_key.to_vec())?;
     let return_types = return_as.unwrap_or_default();
     let mut decrypted: HashMap<String, MsgResultType> = HashMap::new();
@@ -122,7 +122,7 @@ fn decrypt_ciphertext(dk: &DecryptionKey, ciphertext: &Ciphertext, return_as: Op
 /// @param string $ct2_data Binary string of the second operand
 /// @return string The encrypted result of the addition
 #[php_function]
-pub fn add(encryption_key: Binary<u8>, ct1_data: Binary<u8>, ct2_data: Binary<u8>) -> Result<Binary<u8>, &'static str> {
+pub fn pal_add(encryption_key: Binary<u8>, ct1_data: Binary<u8>, ct2_data: Binary<u8>) -> Result<Binary<u8>, &'static str> {
     let Ok(ek) = EncryptionKey::from_bytes(encryption_key.to_vec()) else { return Err("Bad encryption key") };
     let ciphertext1 = Ciphertext::from_slice(ct1_data.to_vec());
     let ciphertext2 = Ciphertext::from_slice(ct2_data.to_vec());
@@ -135,7 +135,7 @@ pub fn add(encryption_key: Binary<u8>, ct1_data: Binary<u8>, ct2_data: Binary<u8
 /// @param string[] $ciphertext_data Array of ciphertexts to add
 /// @return string The encrypted result of the addition
 #[php_function]
-pub fn add_array(encryption_key: Binary<u8>, ciphertext_data: HashMap<String, Binary<u8>>) -> Result<Binary<u8>, &'static str> {
+pub fn pal_add_array(encryption_key: Binary<u8>, ciphertext_data: HashMap<String, Binary<u8>>) -> Result<Binary<u8>, &'static str> {
     let Ok(ek) = EncryptionKey::from_bytes(encryption_key.to_vec()) else { return Err("Bad encryption key") };
     let Some((mut enc_total, _)) = ek.encrypt(0_i32.to_ne_bytes(), None) else { return Err("Failed to encrypt starting value") };
     for (_, ct_data) in ciphertext_data.iter() {
@@ -161,13 +161,13 @@ pub extern "C" fn php_module_info(_module: *mut ModuleEntry) {
 #[php_module]
 pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
     module
-        .function(wrap_function!(generate_keys))
-        .function(wrap_function!(encrypt))
-        .function(wrap_function!(encrypt_array))
-        .function(wrap_function!(add))
-        .function(wrap_function!(add_array))
-        .function(wrap_function!(decrypt))
-        .function(wrap_function!(decrypt_array))
+        .function(wrap_function!(pal_generate_keys))
+        .function(wrap_function!(pal_encrypt))
+        .function(wrap_function!(pal_encrypt_array))
+        .function(wrap_function!(pal_add))
+        .function(wrap_function!(pal_add_array))
+        .function(wrap_function!(pal_decrypt))
+        .function(wrap_function!(pal_decrypt_array))
         .info_function(php_module_info)
 }
 
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn keys() -> Result<(), &'static str> {
-        let keys = generate_keys()?;
+        let keys = pal_generate_keys()?;
         let Some(_) = keys.get("0") else { return Err("Missing key 0") };
         let Some(_) = keys.get("1") else { return Err("Missing key 1") };
         let Some(_) = keys.get("encryption_key") else { return Err("Missing key encryption_key") };
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn encrypt_decrypt() -> Result<(), String> {
-        let keys = generate_keys()?;
+        let keys = pal_generate_keys()?;
         let Some(ek_data) = keys.get("encryption_key") else { return Err("No encryption key".to_string()) };
         let Ok(ek) = EncryptionKey::from_bytes(ek_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
         let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn enc_add() -> Result<(), String> {
-        let keys = generate_keys()?;
+        let keys = pal_generate_keys()?;
         let Some(ek_data) = keys.get("encryption_key") else { return Err("No encryption key".to_string()) };
         let Ok(ek) = EncryptionKey::from_bytes(ek_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
         let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };

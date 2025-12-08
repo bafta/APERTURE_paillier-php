@@ -7,7 +7,7 @@
  * Returns a randomly generated keypair
  * @return array [0 => encryption_key, 1 => decryption_key, 'encryption_key' -> ..., 'decryption_key' => ...]
  */
-function generate_keys(): array
+function pal_generate_keys(): array
 
 /**
  * Encrypt a message
@@ -15,7 +15,7 @@ function generate_keys(): array
  * @param string $msg The int or string to be encrypted
  * @return string The encrypted ciphertext
  */
-function encrypt(string $encryption_key, mixed $msg): string
+function pal_encrypt(string $encryption_key, mixed $msg): string
 
 /**
  * Encrypt an array of messages
@@ -23,7 +23,7 @@ function encrypt(string $encryption_key, mixed $msg): string
  * @param string|int[] $msgs Array of ints or strings to be encrypted
  * @return string[] The encrypted ciphertext, keys are preserved
  */
-function encrypt_array(string $encryption_key, array $msgs): array
+function pal_encrypt_array(string $encryption_key, array $msgs): array
 
 /**
  * Paillier add two ciphertexts
@@ -32,7 +32,15 @@ function encrypt_array(string $encryption_key, array $msgs): array
  * @param string ct2_data Binary string of the second operand
  * @return string The encrypted result of the addition
  */
-function add(string $encryption_key, string $ct1_data, string $ct2_data): string
+function pal_add(string $encryption_key, array $ct1_data, string $ct2_data): string
+
+/**
+ * Paillier add all ciphertexts in an array
+ * @param string $encryption_key Binary string containing the encryption key
+ * @param string[] $ciphertext_data Array of ciphertexts to add
+ * @return string The encrypted result of the addition
+ */
+function pal_add_array(string $encryption_key, string $ciphertext_data): string
 
 /**
  * Decrypt a ciphertext
@@ -41,7 +49,7 @@ function add(string $encryption_key, string $ct1_data, string $ct2_data): string
  * @param string $return_as Indicates what type to cast the returned data as, "INT" or "STRING", default "INT"
  * @return int|string The decrypted plaintext
  */
-function decrypt(string $decryption_key, string $ct_data, ?string $return_as): int|string
+function pal_decrypt(string $decryption_key, string $ct_data, ?string $return_as): int|string
 
 /**
  * Decrypt an array of ciphertexts
@@ -49,7 +57,7 @@ function decrypt(string $decryption_key, string $ct_data, ?string $return_as): i
  * @param string[] $ciphertext_data Array of binary strings to be decrypted
  * @param string[] Indicates what type to cast the returned data with the same key, each value "INT" or "STRING", defaults to "INT" for any missing items
  */
-function decrypt_array(string $decryption_key, array $ciphertext_data, ?array $return_as): array
+function pal_decrypt_array(string $decryption_key, array $ciphertext_data, ?array $return_as): array
 ```
 ## Installation
 Install the dev environment following [these instructions](https://ext-php.rs/getting-started/installation.html) then

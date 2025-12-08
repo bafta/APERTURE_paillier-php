@@ -7,7 +7,7 @@ use libpaillier::{Ciphertext, DecryptionKey, EncryptionKey};
 
 #[derive(ZvalConvert, PartialEq, Debug)]
 pub enum MsgResultType {
-    Int(i64),
+    Int(u64),
     Str(String),
     None
 }
@@ -170,6 +170,7 @@ pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::prelude::*;
 
     #[test]
     fn keys() -> Result<(), &'static str> {
@@ -188,10 +189,12 @@ mod tests {
         let Ok(ek) = EncryptionKey::from_bytes(ek_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
         let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
         let Ok(dk) = DecryptionKey::from_bytes(dk_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
-        let plain_val = MsgResultType::Int(12345);
-        let enc_val = encrypt_msg(&ek, &plain_val)?;
+
+        let mut rng = rand::rng();
+        let plain_val = rng.random::<u32>() as u64;
+        let enc_val = encrypt_msg(&ek, &MsgResultType::Int(plain_val))?;
         let dec_val = decrypt_ciphertext(&dk, &enc_val, None)?;
-        assert_eq!(plain_val, dec_val);
+        assert_eq!(MsgResultType::Int(plain_val), dec_val);
         Ok(())
     }
 
@@ -203,22 +206,17 @@ mod tests {
         let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
         let Ok(dk) = DecryptionKey::from_bytes(dk_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
 
-        let plain1 = MsgResultType::Int(1234);
-        let enc1 = encrypt_msg(&ek, &plain1)?;
-        let plain2 = MsgResultType::Int(2345);
-        let enc2 = encrypt_msg(&ek, &plain2)?;
+        let mut rng = rand::rng();
+        let plain1 = rng.random::<u32>() as u64;
+        let plain2 = rng.random::<u32>() as u64;
+        let plain_sum = plain1 + plain2;
 
+        let enc1 = encrypt_msg(&ek, &MsgResultType::Int(plain1))?;
+        let enc2 = encrypt_msg(&ek, &MsgResultType::Int(plain2))?;
         let enc_sum = add_ciphertexts(&ek, &enc1, &enc2)?;
         let sum = decrypt_ciphertext(&dk, &enc_sum, None)?;
 
-        assert_eq!(sum, MsgResultType::Int(3579));
+        assert_eq!(sum, MsgResultType::Int(plain_sum), "p1 {plain1} p2 {plain2} psum {plain_sum} sum {sum:?}");
         Ok(())
     }
-
-    //#[test]
-    //fn should_fail() {
-    //    let val1 = MsgResultType::Int(12345);
-    //    let val2 = MsgResultType::Int(67890);
-    //    assert_eq!(val1, val2);
-    //}
 }

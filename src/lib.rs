@@ -3,7 +3,10 @@
 /// Paillier-rs docs https://crates.io/crates/libpaillier
 use std::collections::HashMap;
 use ext_php_rs::{info_table_end, info_table_row, info_table_start, prelude::*, zend::ModuleEntry, binary::Binary};
-use libpaillier::{Ciphertext, DecryptionKey, EncryptionKey};
+use libpaillier::{unknown_order::BigNumber, Ciphertext, DecryptionKey, EncryptionKey};
+
+// TODO look for a library that uses 2048bit keys
+// implement a wrapper for multiplication
 
 #[derive(ZvalConvert, PartialEq, Debug)]
 pub enum MsgResultType {
@@ -151,6 +154,23 @@ fn add_ciphertexts(ek: &EncryptionKey, ciphertext1: &Ciphertext, ciphertext2: &C
     Ok(sum)
 }
 
+/// Paillier multiply a ciphertext by a number
+/// @param string $encryption_key Binary string containing the encryption key
+/// @param string $ct_data Binary string of the ciphertext
+/// @param int $factor number by which to multiply the cipertext
+/// @return string The encrypted result of the multiplication
+#[php_function]
+pub fn pal_multiply(encryption_key: Binary<u8>, ct_data: Binary<u8>, factor: i64) -> Result<Binary<u8>, String> {
+    let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
+    let ciphertext = Ciphertext::from_slice(ct_data.to_vec());
+    Ok((multiply_ciphertext(&ek, &ciphertext, BigNumber::from(factor))?).to_bytes().into_iter().collect::<Binary<_>>())
+}
+
+fn multiply_ciphertext(ek: &EncryptionKey, ciphertext: &Ciphertext, factor: BigNumber) -> Result<Ciphertext, String> {
+    let Some(mult_ciphertext) = ek.mul(ciphertext, &factor) else { return Err("Failed to multipy".to_string()) };
+    Ok(mult_ciphertext)
+}
+
 pub extern "C" fn php_module_info(_module: *mut ModuleEntry) {
     info_table_start!();
     info_table_row!("Paillier PHP", "enabled");
@@ -166,6 +186,7 @@ pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
         .function(wrap_function!(pal_encrypt_array))
         .function(wrap_function!(pal_add))
         .function(wrap_function!(pal_add_array))
+        .function(wrap_function!(pal_multiply))
         .function(wrap_function!(pal_decrypt))
         .function(wrap_function!(pal_decrypt_array))
         .info_function(php_module_info)
@@ -221,6 +242,24 @@ mod tests {
         let sum = decrypt_ciphertext(&dk, &enc_sum, None)?;
 
         assert_eq!(sum, MsgResultType::Int(plain_sum), "p1 {plain1} p2 {plain2} psum {plain_sum} sum {sum:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn multiply() -> Result<(), String> {
+        let keys = pal_generate_keys()?;
+        let Some(ek_data) = keys.get("encryption_key") else { return Err("No encryption key".to_string()) };
+        let Ok(ek) = EncryptionKey::from_bytes(ek_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
+        let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
+        let Ok(dk) = DecryptionKey::from_bytes(dk_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
+
+        let mut rng = rand::rng();
+        let plain_val = rng.random::<u32>() as i64;
+        let enc_val = encrypt_msg(&ek, &MsgResultType::Int(plain_val))?;
+        let factor = rng.random::<u32>() as i64;
+        let mult_val = multiply_ciphertext(&ek, &enc_val, BigNumber::from(factor))?;
+        let dec_val = decrypt_ciphertext(&dk, &mult_val, None)?;
+        assert_eq!(MsgResultType::Int(plain_val * factor), dec_val);
         Ok(())
     }
 }

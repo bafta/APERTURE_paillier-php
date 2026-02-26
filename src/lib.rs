@@ -36,6 +36,22 @@ pub fn pal_generate_keys() -> Result<HashMap<String, Binary<u8>>, &'static str> 
     Ok(keys)
 }
 
+/// Returns g & n for an encryption key so it can be used with other Paillier libraries
+/// @param string $encryption_key Binary string containing the encryption key
+/// @return array [0 => g, 1 => n, 'g' -> g, 'n' => n]
+#[php_function]
+pub fn pal_get_encryption_key_numbers(encryption_key: Binary<u8>) -> Result<HashMap<String, Binary<u8>>, String> {
+    let ek = EncryptionKey::from_bytes(encryption_key.to_vec())?;
+    let n = ek.n();
+    let g: BigNumber = n + 1; // As best I can tell this is a standard optimisation that libpaillier uses
+    let mut numbers = HashMap::new();
+    numbers.insert("0".to_string(), n.to_bytes().into_iter().collect::<Binary<_>>());
+    numbers.insert("1".to_string(), g.to_bytes().into_iter().collect::<Binary<_>>());
+    numbers.insert("n".to_string(), n.to_bytes().into_iter().collect::<Binary<_>>());
+    numbers.insert("g".to_string(), g.to_bytes().into_iter().collect::<Binary<_>>());
+    Ok(numbers)
+}
+
 /// Encrypt a message
 /// @param string $encryption_key Binary string containing the encryption key
 /// @param string $msg The int or string to be encrypted
@@ -182,6 +198,7 @@ pub extern "C" fn php_module_info(_module: *mut ModuleEntry) {
 pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
     module
         .function(wrap_function!(pal_generate_keys))
+        .function(wrap_function!(pal_get_encryption_key_numbers))
         .function(wrap_function!(pal_encrypt))
         .function(wrap_function!(pal_encrypt_array))
         .function(wrap_function!(pal_add))

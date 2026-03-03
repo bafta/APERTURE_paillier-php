@@ -310,7 +310,7 @@ mod tests {
         let mut rng = rand::rng();
         let plain_val = rng.random::<u32>() as i64;
         let enc_val = encrypt_msg(&ek, &MsgResultType::Int(plain_val))?;
-        let factor = rng.random::<u32>() as i64;
+        let factor = rng.random::<u16>() as i64;
         let mult_val = multiply_ciphertext(&ek, &enc_val, BigNumber::from(factor))?;
         let dec_val = decrypt_ciphertext(&dk, &mult_val, None)?;
         assert_eq!(MsgResultType::Int(plain_val * factor), dec_val);

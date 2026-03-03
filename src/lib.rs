@@ -156,13 +156,23 @@ pub fn pal_add(encryption_key: Binary<u8>, ct1_data: Binary<u8>, ct2_data: Binar
 #[php_function]
 pub fn pal_add_array(encryption_key: Binary<u8>, ciphertext_data: HashMap<String, Binary<u8>>) -> Result<Binary<u8>, &'static str> {
     let Ok(ek) = EncryptionKey::from_bytes(encryption_key.to_vec()) else { return Err("Bad encryption key") };
-    let Some((mut enc_total, _)) = ek.encrypt(0_i32.to_ne_bytes(), None) else { return Err("Failed to encrypt starting value") };
-    for (_, ct_data) in ciphertext_data.iter() {
-        let ciphertext = Ciphertext::from_slice(ct_data.to_vec());
-        enc_total = add_ciphertexts(&ek, &enc_total, &ciphertext)?;
+    if ciphertext_data.is_empty() {
+        return Err("Nothing to add");
     }
 
-    Ok(enc_total.to_bytes().into_iter().collect::<Binary<_>>())
+    let mut enc_total: Option<Ciphertext> = None;
+    for (_, ct_data) in ciphertext_data.iter() {
+        let ciphertext = Ciphertext::from_slice(ct_data.to_vec());
+        match enc_total {
+            Some(curr_total) => enc_total = Some(add_ciphertexts(&ek, &curr_total, &ciphertext)?),
+            None => enc_total = Some(ciphertext),
+        }
+    }
+
+    match enc_total {
+        Some(final_total) => Ok(final_total.to_bytes().into_iter().collect::<Binary<_>>()),
+        None => Err("Error adding array"),
+    }
 }
 
 fn add_ciphertexts(ek: &EncryptionKey, ciphertext1: &Ciphertext, ciphertext2: &Ciphertext) -> Result<Ciphertext, &'static str> {
@@ -259,6 +269,33 @@ mod tests {
         let sum = decrypt_ciphertext(&dk, &enc_sum, None)?;
 
         assert_eq!(sum, MsgResultType::Int(plain_sum), "p1 {plain1} p2 {plain2} psum {plain_sum} sum {sum:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn enc_add_array() -> Result<(), String> {
+        let keys = pal_generate_keys()?;
+        let Some(ek_data) = keys.get("encryption_key") else { return Err("No encryption key".to_string()) };
+        let Ok(ek) = EncryptionKey::from_bytes(ek_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
+        let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
+        let Ok(dk) = DecryptionKey::from_bytes(dk_data.to_vec()) else { return Err("Bad encryption key data".to_string()) };
+
+        let mut rng = rand::rng();
+        let plain1 = rng.random::<u32>() as i64;
+        let enc1 = (encrypt_msg(&ek, &MsgResultType::Int(plain1))?).to_bytes().into_iter().collect();
+        let plain2 = rng.random::<u32>() as i64;
+        let enc2 = (encrypt_msg(&ek, &MsgResultType::Int(plain2))?).to_bytes().into_iter().collect();
+        let plain3 = rng.random::<u32>() as i64;
+        let enc3 = (encrypt_msg(&ek, &MsgResultType::Int(plain3))?).to_bytes().into_iter().collect();
+        let plain_sum = plain1 + plain2 + plain3;
+
+        let mut ary = HashMap::new();
+        ary.insert("1".to_string(), enc1);
+        ary.insert("2".to_string(), enc2);
+        ary.insert("3".to_string(), enc3);
+        let array_sum = pal_add_array(ek_data.to_vec().into_iter().collect(), ary)?;
+        let dec_sum = decrypt_ciphertext(&dk, &Ciphertext::from_slice(array_sum.to_vec()), None)?;
+        assert_eq!(MsgResultType::Int(plain_sum), dec_sum);
         Ok(())
     }
 

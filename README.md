@@ -10,6 +10,13 @@
 function pal_generate_keys(): array
 
 /**
+ * Returns g & n for an encryption key so it can be used with other Paillier libraries
+ * @param string $encryption_key Binary string containing the encryption key
+ * @return array [0 => g, 1 => n, 'g' -> g, 'n' => n]
+ */
+function pal_get_encryption_key_numbers(string $encryption_key): array
+
+/**
  * Encrypt a message
  * @param string $encryption_key Binary string containing the encryption key
  * @param string $msg The int or string to be encrypted
@@ -43,10 +50,19 @@ function pal_add(string $encryption_key, array $ct1_data, string $ct2_data): str
 function pal_add_array(string $encryption_key, string $ciphertext_data): string
 
 /**
+ * Paillier multiply a ciphertext by a number
+ * @param string $encryption_key Binary string containing the encryption key
+ * @param string $ct_data Binary string of the ciphertext
+ * @param int $factor number by which to multiply the cipertext
+ * @return string The encrypted result of the multiplication
+ */
+function pal_multiply(string $encryption_key, string $ct_data, int $factor): string
+
+/**
  * Decrypt a ciphertext
  * @param string $decryption_key Binary string containing the decryption key
  * @param string $ct_data Binary ciphertext string to be decrypted
- * @param string $return_as Indicates what type to cast the returned data as, "INT" or "STRING", default "INT"
+ * @param string $return_as Indicates what type to cast the returned data as, "INT" or "STRING", default "STRING"
  * @return int|string The decrypted plaintext
  */
 function pal_decrypt(string $decryption_key, string $ct_data, ?string $return_as): int|string
@@ -55,7 +71,7 @@ function pal_decrypt(string $decryption_key, string $ct_data, ?string $return_as
  * Decrypt an array of ciphertexts
  * @param string $encryption_key Binary string containing the encryption key
  * @param string[] $ciphertext_data Array of binary strings to be decrypted
- * @param string[] Indicates what type to cast the returned data with the same key, each value "INT" or "STRING", defaults to "INT" for any missing items
+ * @param string[] $return_as Indicates what type to cast the returned data with the same key, each value "INT" or "STRING", defaults to "STRING" for any missing items
  */
 function pal_decrypt_array(string $decryption_key, array $ciphertext_data, ?array $return_as): array
 ```

@@ -101,7 +101,7 @@ pub fn pal_decrypt(decryption_key: Binary<u8>, ct_data: Binary<u8>, return_as: O
 /// Decrypt an array of ciphertexts
 /// @param string $encryption_key Binary string containing the encryption key
 /// @param string[] $ciphertext_data Array of binary strings to be decrypted
-/// @param string[] Indicates what type to cast the returned data with the same key, each value "INT" or "STRING", defaults to "STRING" for any missing items
+/// @param string[] $return_as Indicates what type to cast the returned data with the same key, each value "INT" or "STRING", defaults to "STRING" for any missing items
 #[php_function]
 pub fn pal_decrypt_array(decryption_key: Binary<u8>, ciphertext_data: HashMap<String, Binary<u8>>, return_as: Option<HashMap<String, String>>) -> Result<HashMap<String, MsgResultType>, String> {
     let dk = DecryptionKey::from_bytes(decryption_key.to_vec())?;

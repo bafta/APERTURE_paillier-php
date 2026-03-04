@@ -90,7 +90,7 @@ fn encrypt_msg(ek: &EncryptionKey, msg: &MsgResultType) -> Result<Ciphertext, St
 /// Decrypt a ciphertext
 /// @param string $decryption_key Binary string containing the decryption key
 /// @param string $ct_data Binary ciphertext string to be decrypted
-/// @param string $return_as Indicates what type to cast the returned data as, "INT" or "STRING", default "INT"
+/// @param string $return_as Indicates what type to cast the returned data as, "INT" or "STRING", default "STRING"
 /// @return string The decrypted plaintext
 #[php_function]
 pub fn pal_decrypt(decryption_key: Binary<u8>, ct_data: Binary<u8>, return_as: Option<String>) -> Result<MsgResultType, String> {
@@ -101,7 +101,7 @@ pub fn pal_decrypt(decryption_key: Binary<u8>, ct_data: Binary<u8>, return_as: O
 /// Decrypt an array of ciphertexts
 /// @param string $encryption_key Binary string containing the encryption key
 /// @param string[] $ciphertext_data Array of binary strings to be decrypted
-/// @param string[] Indicates what type to cast the returned data with the same key, each value "INT" or "STRING", defaults to "INT" for any missing items
+/// @param string[] Indicates what type to cast the returned data with the same key, each value "INT" or "STRING", defaults to "STRING" for any missing items
 #[php_function]
 pub fn pal_decrypt_array(decryption_key: Binary<u8>, ciphertext_data: HashMap<String, Binary<u8>>, return_as: Option<HashMap<String, String>>) -> Result<HashMap<String, MsgResultType>, String> {
     let dk = DecryptionKey::from_bytes(decryption_key.to_vec())?;
@@ -116,7 +116,7 @@ pub fn pal_decrypt_array(decryption_key: Binary<u8>, ciphertext_data: HashMap<St
 
 fn decrypt_ciphertext(dk: &DecryptionKey, ciphertext: &Ciphertext, return_as: Option<String>) -> Result<MsgResultType, String> {
     let Some(mut plaintext) = dk.decrypt(ciphertext) else { return Err("Failed to decrypt".to_string()) };
-    let return_type = return_as.unwrap_or("INT".to_string()).to_uppercase();
+    let return_type = return_as.unwrap_or("STRING".to_string()).to_uppercase();
     match return_type.as_str() {
         "INT" => {
             plaintext.truncate(8);
@@ -245,7 +245,7 @@ mod tests {
         let mut rng = rand::rng();
         let plain_val = rng.random::<u32>() as i64;
         let enc_val = encrypt_msg(&ek, &MsgResultType::Int(plain_val))?;
-        let dec_val = decrypt_ciphertext(&dk, &enc_val, None)?;
+        let dec_val = decrypt_ciphertext(&dk, &enc_val, Some("INT".to_string()))?;
         assert_eq!(MsgResultType::Int(plain_val), dec_val);
         Ok(())
     }
@@ -266,7 +266,7 @@ mod tests {
         let enc1 = encrypt_msg(&ek, &MsgResultType::Int(plain1))?;
         let enc2 = encrypt_msg(&ek, &MsgResultType::Int(plain2))?;
         let enc_sum = add_ciphertexts(&ek, &enc1, &enc2)?;
-        let sum = decrypt_ciphertext(&dk, &enc_sum, None)?;
+        let sum = decrypt_ciphertext(&dk, &enc_sum, Some("INT".to_string()))?;
 
         assert_eq!(sum, MsgResultType::Int(plain_sum), "p1 {plain1} p2 {plain2} psum {plain_sum} sum {sum:?}");
         Ok(())
@@ -294,7 +294,7 @@ mod tests {
         ary.insert("2".to_string(), enc2);
         ary.insert("3".to_string(), enc3);
         let array_sum = pal_add_array(ek_data.to_vec().into_iter().collect(), ary)?;
-        let dec_sum = decrypt_ciphertext(&dk, &Ciphertext::from_slice(array_sum.to_vec()), None)?;
+        let dec_sum = decrypt_ciphertext(&dk, &Ciphertext::from_slice(array_sum.to_vec()), Some("INT".to_string()))?;
         assert_eq!(MsgResultType::Int(plain_sum), dec_sum);
         Ok(())
     }
@@ -312,7 +312,7 @@ mod tests {
         let enc_val = encrypt_msg(&ek, &MsgResultType::Int(plain_val))?;
         let factor = rng.random::<u16>() as i64;
         let mult_val = multiply_ciphertext(&ek, &enc_val, BigNumber::from(factor))?;
-        let dec_val = decrypt_ciphertext(&dk, &mult_val, None)?;
+        let dec_val = decrypt_ciphertext(&dk, &mult_val, Some("INT".to_string()))?;
         assert_eq!(MsgResultType::Int(plain_val * factor), dec_val);
         Ok(())
     }

@@ -1,5 +1,5 @@
 # PHP Paillier encryption library and PHP extension
-[Wraps libpaillier](https://crates.io/crates/libpaillier)
+[Wraps fast_paillier](https://docs.rs/fast-paillier/0.1.1/fast_paillier/)
 ## Usage
 ```php
 <?php

@@ -77,7 +77,7 @@ pub fn pal_encrypt_array(encryption_key: String, msgs: HashMap<String, MsgResult
 
 fn encrypt_msg(ek: &EncryptionKey, msg: &MsgResultType) -> Result<Ciphertext, String> {
     let msg_data = match msg {
-        MsgResultType::Int(int_val) => Integer::from(int_val.clone() as i128),
+        MsgResultType::Int(int_val) => Integer::from(*int_val as i128),
         // TODO vvv Which string format do we want? vvv
         //MsgResultType::Str(str_val) => Integer::parse(str_val.as_bytes()).unwrap().complete(),
         MsgResultType::Str(str_val) => Integer::from_str_radix(str_val, 36).unwrap(),
@@ -116,7 +116,7 @@ pub fn pal_decrypt_array(decryption_key_data: String, ciphertext_data: HashMap<S
 
 fn validate_decryption_key(decryption_key_data: String) -> Result<DecryptionKey, String> {
     let pq: Vec<&str> = decryption_key_data.split("||").collect();
-    if pq.iter().count() != 2 {
+    if pq.len() != 2 {
         return Err("Bad decryption key data".to_string());
     }
     let Ok(p) = Integer::from_str_radix(pq[0], 36) else { return Err("Bad decryption key data (p)".to_string()) };
@@ -167,7 +167,7 @@ pub fn pal_add_array(encryption_key: String, ciphertext_data: HashMap<String, St
 
     let mut enc_total: Option<Ciphertext> = None;
     for (_, ct_data) in ciphertext_data.iter() {
-        let Ok(ciphertext) = Ciphertext::from_str_radix(&ct_data, 36) else { return Err("Bad ciphertext data".to_string()) };
+        let Ok(ciphertext) = Ciphertext::from_str_radix(ct_data, 36) else { return Err("Bad ciphertext data".to_string()) };
         match enc_total {
             Some(curr_total) => enc_total = Some(add_ciphertexts(&ek, &curr_total, &ciphertext)?),
             None => enc_total = Some(ciphertext),
@@ -194,7 +194,7 @@ fn add_ciphertexts(ek: &EncryptionKey, ciphertext1: &Ciphertext, ciphertext2: &C
 pub fn pal_multiply(encryption_key: String, ct_data: String, factor: i64) -> Result<String, String> {
     let ek = EncryptionKey::from_n(Integer::from_str_radix(&encryption_key, 36).unwrap());
     let Ok(ciphertext) = Ciphertext::from_str_radix(&ct_data, 36) else { return Err("Bad ciphertext data".to_string()) };
-    let Ok(fac) = Integer::try_from(factor);
+    let fac = Integer::from(factor);
     let mult_ciphertext = multiply_ciphertext(&ek, &ciphertext, fac)?;
     Ok(mult_ciphertext.to_string_radix(36))
 }
@@ -234,13 +234,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn keys() -> Result<(), &'static str> {
+    fn keys() -> Result<(), String> {
         let keys = pal_generate_keys()?;
-        let Some(_) = keys.get("0") else { return Err("Missing key 0") };
-        let Some(_) = keys.get("1") else { return Err("Missing key 1") };
-        let Some(_) = keys.get("encryption_key") else { return Err("Missing key encryption_key") };
-        let Some(_) = keys.get("decryption_key") else { return Err("Missing key decryption_key") };
+        let Some(_) = keys.get("0") else { return Err("Missing key 0".to_string()) };
+        let Some(_) = keys.get("1") else { return Err("Missing key 1".to_string()) };
+        let Some(_) = keys.get("encryption_key") else { return Err("Missing key encryption_key".to_string()) };
+        let Some(_) = keys.get("decryption_key") else { return Err("Missing key decryption_key".to_string()) };
         Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn show_keys() -> Result<(), String> {
+        let keys = pal_generate_keys()?;
+        return Err(format!("{:?}", keys));
     }
 
     #[test]

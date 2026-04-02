@@ -874,7 +874,6 @@ dependencies = [
  "ext-php-rs",
  "fast-paillier",
  "rand_core",
- "rug",
 ]
 
 [[package]]

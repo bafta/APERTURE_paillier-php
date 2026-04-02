@@ -2,9 +2,9 @@
 /// Install the dev environment following the instructions here... https://ext-php.rs/getting-started/installation.html
 /// Paillier-rs docs https://crates.io/crates/libpaillier
 use std::collections::HashMap;
-use ext_php_rs::{info_table_end, info_table_row, info_table_start, prelude::*, zend::ModuleEntry, binary::Binary};
+use ext_php_rs::{info_table_end, info_table_row, info_table_start, prelude::*, zend::ModuleEntry};
 use fast_paillier::*;
-use rug::{integer::Order, Integer};
+use fast_paillier::backend::Integer;
 
 #[derive(ZvalConvert, PartialEq, Debug)]
 pub enum MsgResultType {
@@ -13,13 +13,6 @@ pub enum MsgResultType {
     None
 }
 
-//#[derive(ZvalConvert, PartialEq, Debug)]
-//pub enum ResultType {
-//    Int(i64),
-//    Str(String),
-//    None
-//}
-
 /// Returns a randomly generated keypair
 /// @return array [0 => encryption_key, 1 => decryption_key, 'encryption_key' -> ..., 'decryption_key' => ...]
 #[php_function]
@@ -27,10 +20,10 @@ pub fn pal_generate_keys() -> Result<HashMap<String, String>, &'static str> {
     let Ok(dk) = DecryptionKey::generate(&mut rand_core::OsRng) else { return Err("Failed to generate decryption key") };
     let ek = EncryptionKey::from_n(dk.n().clone());
     let mut keys = HashMap::new();
-    keys.insert("0".to_string(), ek.n().to_string_radix(36));
-    keys.insert("1".to_string(), format!("{}||{}", dk.p().to_string_radix(36), dk.q().to_string_radix(36)));
-    keys.insert("encryption_key".to_string(), ek.n().to_string_radix(36));
-    keys.insert("decryption_key".to_string(), format!("{}||{}", dk.p().to_string_radix(36), dk.q().to_string_radix(36)));
+    keys.insert("0".to_string(), ek.n().to_str_radix(36));
+    keys.insert("1".to_string(), format!("{}||{}", dk.p().to_str_radix(36), dk.q().to_str_radix(36)));
+    keys.insert("encryption_key".to_string(), ek.n().to_str_radix(36));
+    keys.insert("decryption_key".to_string(), format!("{}||{}", dk.p().to_str_radix(36), dk.q().to_str_radix(36)));
     Ok(keys)
 }
 
@@ -38,15 +31,14 @@ pub fn pal_generate_keys() -> Result<HashMap<String, String>, &'static str> {
 /// @param string $encryption_key Binary string containing the encryption key
 /// @return array [0 => g, 1 => n, 'g' -> g, 'n' => n]
 #[php_function]
-pub fn pal_get_encryption_key_numbers(encryption_key: Binary<u8>) -> Result<HashMap<String, Binary<u8>>, String> {
-    // TODO change this to string?
-    let n = rug::Integer::from_digits(&encryption_key.to_vec(), Order::MsfBe);
-    let g: rug::Integer = n.clone() + 1; // As best I can tell this is a standard optimisation that fast_paillier uses
+pub fn pal_get_encryption_key_numbers(encryption_key: String) -> Result<HashMap<String, String>, String> {
+    let Some(n) = Integer::from_str_radix(&encryption_key, 36) else { return Err("Bad encryption key data".to_string()) };
+    let g: Integer = n.clone() + 1; // As best I can tell this is a standard optimisation that fast_paillier uses
     let mut numbers = HashMap::new();
-    numbers.insert("0".to_string(), n.to_digits(Order::MsfBe).into_iter().collect::<Binary<_>>());
-    numbers.insert("1".to_string(), g.to_digits(Order::MsfBe).into_iter().collect::<Binary<_>>());
-    numbers.insert("n".to_string(), n.to_digits(Order::MsfBe).into_iter().collect::<Binary<_>>());
-    numbers.insert("g".to_string(), g.to_digits(Order::MsfBe).into_iter().collect::<Binary<_>>());
+    numbers.insert("0".to_string(), n.to_str_radix(36));
+    numbers.insert("1".to_string(), g.to_str_radix(36));
+    numbers.insert("n".to_string(), n.to_str_radix(36));
+    numbers.insert("g".to_string(), g.to_str_radix(36));
     Ok(numbers)
 }
 
@@ -57,7 +49,7 @@ pub fn pal_get_encryption_key_numbers(encryption_key: Binary<u8>) -> Result<Hash
 #[php_function]
 pub fn pal_encrypt(encryption_key: String, msg: MsgResultType) -> Result<String, String> {
     let ek = validate_encryption_key(encryption_key)?;
-    Ok((encrypt_msg(&ek, &msg)?).to_string_radix(36))
+    Ok((encrypt_msg(&ek, &msg)?).to_str_radix(36))
 }
 
 /// Encrypt an array of messages
@@ -69,28 +61,25 @@ pub fn pal_encrypt_array(encryption_key: String, msgs: HashMap<String, MsgResult
     let ek = validate_encryption_key(encryption_key)?;
     let mut encrypted: HashMap<String, String> = HashMap::new();
     for (key, msg) in msgs.iter() {
-        encrypted.insert(key.clone(), (encrypt_msg(&ek, msg)?).to_string_radix(36));
+        encrypted.insert(key.clone(), (encrypt_msg(&ek, msg)?).to_str_radix(36));
     }
 
     Ok(encrypted)
 }
 
 fn validate_encryption_key(encryption_key_data: String) -> Result<EncryptionKey, String> {
-    let n = match Integer::from_str_radix(&encryption_key_data, 36) {
-        Ok(n) => n,
-        Err(err) => return Err(err.to_string()),
-    };
+    let Some(n) = Integer::from_str_radix(&encryption_key_data, 36) else { return Err("Bad encryption key data".to_string()) };
     Ok(EncryptionKey::from_n(n))
 }
 
 fn encrypt_msg(ek: &EncryptionKey, msg: &MsgResultType) -> Result<Ciphertext, String> {
     let msg_data = match msg {
-        MsgResultType::Int(int_val) => Integer::from(*int_val as i128),
+        MsgResultType::Int(int_val) => Integer::from(*int_val as u32),
         // TODO vvv Which string format do we want? vvv
         //MsgResultType::Str(str_val) => Integer::parse(str_val.as_bytes()).unwrap().complete(),
         MsgResultType::Str(str_val) => match Integer::from_str_radix(str_val, 36) {
-            Ok(int) => int,
-            Err(err) => return Err(err.to_string()),
+            Some(int) => int,
+            None => return Err("Bad message data".to_string()),
         },
         MsgResultType::None => return Err("Bad type".to_string()),
     };
@@ -106,10 +95,7 @@ fn encrypt_msg(ek: &EncryptionKey, msg: &MsgResultType) -> Result<Ciphertext, St
 #[php_function]
 pub fn pal_decrypt(decryption_key_data: String, ct_data: String, return_as: Option<String>) -> Result<MsgResultType, String> {
     let dk = validate_decryption_key(decryption_key_data)?;
-    let ciphertext = match Ciphertext::from_str_radix(&ct_data, 36) {
-        Ok(ciphertext) => ciphertext,
-        Err(err) => return Err(err.to_string()),
-    };
+    let Some(ciphertext) = Ciphertext::from_str_radix(&ct_data, 36) else { return Err("Bad ciphertext data".to_string()) };
     decrypt_ciphertext(&dk, &ciphertext, return_as)
 }
 
@@ -123,10 +109,7 @@ pub fn pal_decrypt_array(decryption_key_data: String, ciphertext_data: HashMap<S
     let return_types = return_as.unwrap_or_default();
     let mut decrypted: HashMap<String, MsgResultType> = HashMap::new();
     for (key, ct_data) in ciphertext_data.iter() {
-        let ciphertext = match Ciphertext::from_str_radix(ct_data, 36) {
-            Ok(ciphertext) => ciphertext,
-            Err(err) => return Err(err.to_string()),
-        };
+        let Some(ciphertext) = Ciphertext::from_str_radix(ct_data, 36) else { return Err(format!("Bad ciphertext_data[{}]", key)) };
         decrypted.insert(key.clone(), decrypt_ciphertext(&dk, &ciphertext, return_types.get(key).cloned())?);
     }
 
@@ -138,8 +121,8 @@ fn validate_decryption_key(decryption_key_data: String) -> Result<DecryptionKey,
     if pq.len() != 2 {
         return Err("Bad decryption key data".to_string());
     }
-    let Ok(p) = Integer::from_str_radix(pq[0], 36) else { return Err("Bad decryption key data (p)".to_string()) };
-    let Ok(q) = Integer::from_str_radix(pq[1], 36) else { return Err("Bad decryption key data (q)".to_string()) };
+    let Some(p) = Integer::from_str_radix(pq[0], 36) else { return Err("Bad decryption key data (p)".to_string()) };
+    let Some(q) = Integer::from_str_radix(pq[1], 36) else { return Err("Bad decryption key data (q)".to_string()) };
     let Ok(dk) = DecryptionKey::from_primes(p, q) else { return Err("Failed to recreate decryption key".to_string()) };
     Ok(dk)
 }
@@ -148,12 +131,10 @@ fn decrypt_ciphertext(dk: &DecryptionKey, ciphertext: &Ciphertext, return_as: Op
     let Ok(plaintext) = dk.decrypt(ciphertext) else { return Err("Failed to decrypt".to_string()) };
     let return_type = return_as.unwrap_or("STRING".to_string()).to_uppercase();
     match return_type.as_str() {
-        "INT" => {
-            Ok(MsgResultType::Int(plaintext.to_i64_wrapping()))
-        },
+        // TODO We could go back to the conversion in 708bdc8 or just drop INT altogether?
+        "INT" => Ok(MsgResultType::Int(0)),
         "STRING" => {
-            //let Ok(plaintext_str) = String::from_utf8(plaintext) else { return Err("Could not convert value to string".to_string()) };
-            Ok(MsgResultType::Str(plaintext.to_string_radix(36)))
+            Ok(MsgResultType::Str(plaintext.to_str_radix(36)))
         },
         _ => Err("Bad return type".to_string())
     }
@@ -167,10 +148,10 @@ fn decrypt_ciphertext(dk: &DecryptionKey, ciphertext: &Ciphertext, return_as: Op
 #[php_function]
 pub fn pal_add(encryption_key: String, ct1_data: String, ct2_data: String) -> Result<String, String> {
     let ek = validate_encryption_key(encryption_key)?;
-    let Ok(ciphertext1) = Ciphertext::from_str_radix(&ct1_data, 36) else { return Err("Bad ct1_data".to_string()) };
-    let Ok(ciphertext2) = Ciphertext::from_str_radix(&ct2_data, 36) else { return Err("Bad ct2_data".to_string()) };
+    let Some(ciphertext1) = Ciphertext::from_str_radix(&ct1_data, 36) else { return Err("Bad ct1_data".to_string()) };
+    let Some(ciphertext2) = Ciphertext::from_str_radix(&ct2_data, 36) else { return Err("Bad ct2_data".to_string()) };
     let sum = add_ciphertexts(&ek, &ciphertext1, &ciphertext2)?;
-    Ok(sum.to_string_radix(36))
+    Ok(sum.to_str_radix(36))
 }
 
 /// Paillier add all ciphertexts in an array
@@ -186,7 +167,7 @@ pub fn pal_add_array(encryption_key: String, ciphertext_data: HashMap<String, St
 
     let mut enc_total: Option<Ciphertext> = None;
     for (_, ct_data) in ciphertext_data.iter() {
-        let Ok(ciphertext) = Ciphertext::from_str_radix(ct_data, 36) else { return Err("Bad ciphertext data".to_string()) };
+        let Some(ciphertext) = Ciphertext::from_str_radix(ct_data, 36) else { return Err("Bad ciphertext data".to_string()) };
         match enc_total {
             Some(curr_total) => enc_total = Some(add_ciphertexts(&ek, &curr_total, &ciphertext)?),
             None => enc_total = Some(ciphertext),
@@ -194,7 +175,7 @@ pub fn pal_add_array(encryption_key: String, ciphertext_data: HashMap<String, St
     }
 
     match enc_total {
-        Some(final_total) => Ok(final_total.to_string_radix(36)),
+        Some(final_total) => Ok(final_total.to_str_radix(36)),
         None => Err("Error adding array".to_string()),
     }
 }
@@ -212,10 +193,10 @@ fn add_ciphertexts(ek: &EncryptionKey, ciphertext1: &Ciphertext, ciphertext2: &C
 #[php_function]
 pub fn pal_multiply(encryption_key: String, ct_data: String, factor: i64) -> Result<String, String> {
     let ek = validate_encryption_key(encryption_key)?;
-    let Ok(ciphertext) = Ciphertext::from_str_radix(&ct_data, 36) else { return Err("Bad ciphertext data".to_string()) };
-    let fac = Integer::from(factor);
+    let Some(ciphertext) = Ciphertext::from_str_radix(&ct_data, 36) else { return Err("Bad ciphertext data".to_string()) };
+    let fac = Integer::zero() + factor; // can't create from<i64> but can add it to zero
     let mult_ciphertext = multiply_ciphertext(&ek, &ciphertext, fac)?;
-    Ok(mult_ciphertext.to_string_radix(36))
+    Ok(mult_ciphertext.to_str_radix(36))
 }
 
 fn multiply_ciphertext(ek: &EncryptionKey, ciphertext: &Ciphertext, factor: Integer) -> Result<Ciphertext, String> {
@@ -278,9 +259,10 @@ mod tests {
 
         let mut rng = rand_core::OsRng;
         let plain_val = rng.next_u32() as i64;
+        let plain_msg = MsgResultType::Str((Integer::zero() + plain_val).to_str_radix(36));
         let enc_val = encrypt_msg(&ek, &MsgResultType::Int(plain_val))?;
-        let dec_val = decrypt_ciphertext(&dk, &enc_val, Some("INT".to_string()))?;
-        assert_eq!(MsgResultType::Int(plain_val), dec_val);
+        let dec_val = decrypt_ciphertext(&dk, &enc_val, None)?;
+        assert_eq!(plain_msg, dec_val);
         Ok(())
     }
 
@@ -289,20 +271,21 @@ mod tests {
         let keys = pal_generate_keys()?;
         let Some(ek_data) = keys.get("encryption_key") else { return Err("No encryption key".to_string()) };
         let ek = validate_encryption_key(ek_data.to_string())?;
-        let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
+        let Some(dk_data) = keys.get("decryption_key") else { return Err("No decryption key".to_string()) };
         let dk = validate_decryption_key(dk_data.to_string())?;
 
         let mut rng = rand_core::OsRng;
         let plain1 = rng.next_u32() as i64;
         let plain2 = rng.next_u32() as i64;
         let plain_sum = plain1 + plain2;
+        let plain_msg = MsgResultType::Str((Integer::zero() + plain_sum).to_str_radix(36));
 
         let enc1 = encrypt_msg(&ek, &MsgResultType::Int(plain1))?;
         let enc2 = encrypt_msg(&ek, &MsgResultType::Int(plain2))?;
         let enc_sum = add_ciphertexts(&ek, &enc1, &enc2)?;
-        let sum = decrypt_ciphertext(&dk, &enc_sum, Some("INT".to_string()))?;
+        let sum = decrypt_ciphertext(&dk, &enc_sum, None)?;
 
-        assert_eq!(sum, MsgResultType::Int(plain_sum), "p1 {plain1} p2 {plain2} psum {plain_sum} sum {sum:?}");
+        assert_eq!(sum, plain_msg, "p1 {plain1} p2 {plain2} psum {plain_sum} sum {sum:?}");
         Ok(())
     }
 
@@ -311,26 +294,27 @@ mod tests {
         let keys = pal_generate_keys()?;
         let Some(ek_data) = keys.get("encryption_key") else { return Err("No encryption key".to_string()) };
         let ek = validate_encryption_key(ek_data.to_string())?;
-        let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
+        let Some(dk_data) = keys.get("decryption_key") else { return Err("No decryption key".to_string()) };
         let dk = validate_decryption_key(dk_data.to_string())?;
 
         let mut rng = rand_core::OsRng;
         let plain1 = rng.next_u32() as i64;
-        let enc1 = (encrypt_msg(&ek, &MsgResultType::Int(plain1))?).to_string_radix(36);
+        let enc1 = (encrypt_msg(&ek, &MsgResultType::Int(plain1))?).to_str_radix(36);
         let plain2 = rng.next_u32() as i64;
-        let enc2 = (encrypt_msg(&ek, &MsgResultType::Int(plain2))?).to_string_radix(36);
+        let enc2 = (encrypt_msg(&ek, &MsgResultType::Int(plain2))?).to_str_radix(36);
         let plain3 = rng.next_u32() as i64;
-        let enc3 = (encrypt_msg(&ek, &MsgResultType::Int(plain3))?).to_string_radix(36);
+        let enc3 = (encrypt_msg(&ek, &MsgResultType::Int(plain3))?).to_str_radix(36);
         let plain_sum = plain1 + plain2 + plain3;
+        let plain_msg = MsgResultType::Str((Integer::zero() + plain_sum).to_str_radix(36));
 
         let mut ary = HashMap::new();
         ary.insert("1".to_string(), enc1);
         ary.insert("2".to_string(), enc2);
         ary.insert("3".to_string(), enc3);
         let array_sum_data = pal_add_array(ek_data.to_string(), ary)?;
-        let Ok(array_sum) = Integer::from_str_radix(&array_sum_data, 36) else { return Err("Bad array sum data".to_string()) };
-        let dec_sum = decrypt_ciphertext(&dk, &array_sum, Some("INT".to_string()))?;
-        assert_eq!(MsgResultType::Int(plain_sum), dec_sum);
+        let Some(array_sum) = Integer::from_str_radix(&array_sum_data, 36) else { return Err("Bad array sum data".to_string()) };
+        let dec_sum = decrypt_ciphertext(&dk, &array_sum, None)?;
+        assert_eq!(plain_msg, dec_sum);
         Ok(())
     }
 
@@ -339,17 +323,18 @@ mod tests {
         let keys = pal_generate_keys()?;
         let Some(ek_data) = keys.get("encryption_key") else { return Err("No encryption key".to_string()) };
         let ek = validate_encryption_key(ek_data.to_string())?;
-        let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
+        let Some(dk_data) = keys.get("decryption_key") else { return Err("No decryption key".to_string()) };
         let dk = validate_decryption_key(dk_data.to_string())?;
 
         let mut rng = rand_core::OsRng;
         let plain_val = rng.next_u32() as i64;
         let enc_val = encrypt_msg(&ek, &MsgResultType::Int(plain_val))?;
         let factor = (rng.next_u32() as u16) as i64;
-        let Ok(fac) = Integer::try_from(factor);
+        let fac = Integer::zero() + factor;
+        let plain_msg = MsgResultType::Str((fac.clone() * plain_val).to_str_radix(36));
         let mult_val = multiply_ciphertext(&ek, &enc_val, fac)?;
         let dec_val = decrypt_ciphertext(&dk, &mult_val, Some("INT".to_string()))?;
-        assert_eq!(MsgResultType::Int(plain_val * factor), dec_val);
+        assert_eq!(plain_msg, dec_val);
         Ok(())
     }
 
@@ -358,13 +343,14 @@ mod tests {
         let keys = pal_generate_keys()?;
         let Some(ek_data) = keys.get("encryption_key") else { return Err("No encryption key".to_string()) };
         let ek = validate_encryption_key(ek_data.to_string())?;
-        let Some(dk_data) = keys.get("decryption_key") else { return Err("No deryption key".to_string()) };
+        let Some(dk_data) = keys.get("decryption_key") else { return Err("No decryption key".to_string()) };
         let dk = validate_decryption_key(dk_data.to_string())?;
 
         let plain_zero = 0_i64;
+        let plain_msg = MsgResultType::Str((Integer::zero() + plain_zero).to_str_radix(36));
         let enc_zero = encrypt_msg(&ek, &MsgResultType::Int(plain_zero))?;
-        let dec_zero = decrypt_ciphertext(&dk, &enc_zero, Some("INT".to_string()))?;
-        assert_eq!(MsgResultType::Int(plain_zero), dec_zero);
+        let dec_zero = decrypt_ciphertext(&dk, &enc_zero, None)?;
+        assert_eq!(plain_msg, dec_zero);
         Ok(())
     }
 }

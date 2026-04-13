@@ -28,7 +28,7 @@ pub fn pal_generate_keys() -> Result<HashMap<String, String>, &'static str> {
 }
 
 /// Returns g & n for an encryption key so it can be used with other Paillier libraries
-/// @param string $encryption_key Binary string containing the encryption key
+/// @param string $encryption_key Base 36 encoded string containing the encryption key
 /// @return array [0 => g, 1 => n, 'g' -> g, 'n' => n]
 #[php_function]
 pub fn pal_get_encryption_key_numbers(encryption_key: String) -> Result<HashMap<String, String>, String> {
@@ -43,7 +43,7 @@ pub fn pal_get_encryption_key_numbers(encryption_key: String) -> Result<HashMap<
 }
 
 /// Encrypt a message
-/// @param string $encryption_key Binary string containing the encryption key
+/// @param string $encryption_key Base 36 encoded string containing the encryption key
 /// @param string $msg The int or string to be encrypted
 /// @return string The encrypted ciphertext
 #[php_function]
@@ -53,7 +53,7 @@ pub fn pal_encrypt(encryption_key: String, msg: MsgType) -> Result<String, Strin
 }
 
 /// Encrypt an array of messages
-/// @param string $encryption_key Binary string containing the encryption key
+/// @param string $encryption_key Base 36 encoded string containing the encryption key
 /// @param string|int[] $msgs Array of ints or strings to be encrypted
 /// @return string[] The encrypted ciphertext, keys are preserved
 #[php_function]
@@ -88,9 +88,9 @@ fn encrypt_msg(ek: &EncryptionKey, msg: &MsgType) -> Result<Ciphertext, String> 
 }
 
 /// Decrypt a ciphertext
-/// @param string $decryption_key Binary string containing the decryption key
-/// @param string $ct_data Binary ciphertext string to be decrypted
-/// @return string The decrypted plaintext
+/// @param string $decryption_key Base 36 encoded string containing the decryption key
+/// @param string $ct_data Base 36 encoded ciphertext string to be decrypted
+/// @return string Base 36 encoded decrypted plaintext
 #[php_function]
 pub fn pal_decrypt(decryption_key_data: String, ct_data: String) -> Result<String, String> {
     let dk = validate_decryption_key(decryption_key_data)?;
@@ -99,8 +99,8 @@ pub fn pal_decrypt(decryption_key_data: String, ct_data: String) -> Result<Strin
 }
 
 /// Decrypt an array of ciphertexts
-/// @param string $encryption_key Binary string containing the encryption key
-/// @param string[] $ciphertext_data Array of binary strings to be decrypted
+/// @param string $decryption_key Base 36 encoded string containing the decryption key
+/// @param string[] $ciphertext_data Array of Base 36 encoded strings to be decrypted
 /// @return string[] Array of decrypted plaintexts (base36 encoded)
 #[php_function]
 pub fn pal_decrypt_array(decryption_key_data: String, ciphertext_data: HashMap<String, String>) -> Result<HashMap<String, String>, String> {
@@ -131,9 +131,9 @@ fn decrypt_ciphertext(dk: &DecryptionKey, ciphertext: &Ciphertext) -> Result<Str
 }
 
 /// Paillier add two ciphertexts
-/// @param string $encryption_key Binary string containing the encryption key
-/// @param string $ct1_data Binary string of the first operand
-/// @param string $ct2_data Binary string of the second operand
+/// @param string $encryption_key Base 36 encoded string containing the encryption key
+/// @param string $ct1_data Base 36 encoded string of the first operand
+/// @param string $ct2_data Base 36 encoded string of the second operand
 /// @return string The encrypted result of the addition
 #[php_function]
 pub fn pal_add(encryption_key: String, ct1_data: String, ct2_data: String) -> Result<String, String> {
@@ -145,7 +145,7 @@ pub fn pal_add(encryption_key: String, ct1_data: String, ct2_data: String) -> Re
 }
 
 /// Paillier add all ciphertexts in an array
-/// @param string $encryption_key Binary string containing the encryption key
+/// @param string $encryption_key Base 36 encoded string containing the encryption key
 /// @param string[] $ciphertext_data Array of ciphertexts to add
 /// @return string The encrypted result of the addition
 #[php_function]
@@ -176,8 +176,8 @@ fn add_ciphertexts(ek: &EncryptionKey, ciphertext1: &Ciphertext, ciphertext2: &C
 }
 
 /// Paillier multiply a ciphertext by a number
-/// @param string $encryption_key Binary string containing the encryption key
-/// @param string $ct_data Binary string of the ciphertext
+/// @param string $encryption_key Base 36 encoded string containing the encryption key
+/// @param string $ct_data Base 36 encoded string of the ciphertext
 /// @param int $factor number by which to multiply the cipertext
 /// @return string The encrypted result of the multiplication
 #[php_function]

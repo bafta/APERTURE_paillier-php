@@ -82,3 +82,5 @@ $ cargo install
 $ cargo build
 $ sudo -E path/to/cargo php install
 ```
+
+or copy the pre-built `./target/debug/libpaillier_php.so` to `/usr/lib/php/20240924/libpaillier_php.so` and add `extension=libpaillier_php.so` to php.ini

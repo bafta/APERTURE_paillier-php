@@ -13,8 +13,8 @@ pub enum MsgType {
     None
 }
 
-/// Returns a randomly generated keypair
-/// @return array [0 => encryption_key, 1 => decryption_key, 'encryption_key' -> ..., 'decryption_key' => ...]
+/// Generate a random Paillier keypair.
+/// @return array [0 => encryption_key, 1 => decryption_key, 'encryption_key' -> encryption_key, 'decryption_key' => decryption_key]
 #[php_function]
 pub fn pal_generate_keys() -> Result<HashMap<String, String>, &'static str> {
     let Ok(dk) = DecryptionKey::generate(&mut rand_core::OsRng) else { return Err("Failed to generate decryption key") };
@@ -27,7 +27,7 @@ pub fn pal_generate_keys() -> Result<HashMap<String, String>, &'static str> {
     Ok(keys)
 }
 
-/// Returns g & n for an encryption key so it can be used with other Paillier libraries
+/// Extract the public parameters (n, g) from an encryption key for interop with other Paillier libraries.
 /// @param string $encryption_key Base 36 encoded string containing the encryption key
 /// @return array [0 => g, 1 => n, 'g' -> g, 'n' => n]
 #[php_function]
@@ -42,20 +42,20 @@ pub fn pal_get_encryption_key_numbers(encryption_key: String) -> Result<HashMap<
     Ok(numbers)
 }
 
-/// Encrypt a message
-/// @param string $encryption_key Base 36 encoded string containing the encryption key
-/// @param string $msg The int or string to be encrypted
-/// @return string The encrypted ciphertext
+/// Encrypt a single message.
+/// @param string $encryption_key The encryption key (base-36 encoded)
+/// @param int|string $msg An integer or base-36 encoded string to encrypt
+/// @return string The ciphertext (base-36 encoded)
 #[php_function]
 pub fn pal_encrypt(encryption_key: String, msg: MsgType) -> Result<String, String> {
     let ek = validate_encryption_key(encryption_key)?;
     Ok((encrypt_msg(&ek, &msg)?).to_str_radix(36))
 }
 
-/// Encrypt an array of messages
-/// @param string $encryption_key Base 36 encoded string containing the encryption key
-/// @param string|int[] $msgs Array of ints or strings to be encrypted
-/// @return string[] The encrypted ciphertext, keys are preserved
+/// Encrypt an array of messages. Array keys are preserved.
+/// @param string $encryption_key The encryption key (base-36 encoded)
+/// @param (int|string)[] $msgs Messages to encrypt
+/// @return (int|string)[] Ciphertexts (base-36 encoded)
 #[php_function]
 pub fn pal_encrypt_array(encryption_key: String, msgs: HashMap<String, MsgType>) -> Result<HashMap<String, String>, String> {
     let ek = validate_encryption_key(encryption_key)?;
@@ -87,10 +87,10 @@ fn encrypt_msg(ek: &EncryptionKey, msg: &MsgType) -> Result<Ciphertext, String> 
     Ok(ciphertext)
 }
 
-/// Decrypt a ciphertext
-/// @param string $decryption_key Base 36 encoded string containing the decryption key
-/// @param string $ct_data Base 36 encoded ciphertext string to be decrypted
-/// @return string Base 36 encoded decrypted plaintext
+/// Decrypt a ciphertext.
+/// @param string $decryption_key The decryption key (base-36 encoded)
+/// @param string $ct_data The ciphertext (base-36 encoded)
+/// @return string The decrypted plaintext (base-36 encoded)
 #[php_function]
 pub fn pal_decrypt(decryption_key_data: String, ct_data: String) -> Result<String, String> {
     let dk = validate_decryption_key(decryption_key_data)?;
@@ -98,10 +98,10 @@ pub fn pal_decrypt(decryption_key_data: String, ct_data: String) -> Result<Strin
     decrypt_ciphertext(&dk, &ciphertext)
 }
 
-/// Decrypt an array of ciphertexts
-/// @param string $decryption_key Base 36 encoded string containing the decryption key
-/// @param string[] $ciphertext_data Array of Base 36 encoded strings to be decrypted
-/// @return string[] Array of decrypted plaintexts (base36 encoded)
+/// Decrypt an array of ciphertexts. Array keys are preserved.
+/// @param string $decryption_key The decryption key (base-36 encoded)
+/// @param string[] $ciphertext_data Ciphertexts to decrypt (base-36 encoded)
+/// @return string[] Decrypted plaintexts (base-36 encoded)
 #[php_function]
 pub fn pal_decrypt_array(decryption_key_data: String, ciphertext_data: HashMap<String, String>) -> Result<HashMap<String, String>, String> {
     let dk = validate_decryption_key(decryption_key_data)?;
@@ -130,11 +130,11 @@ fn decrypt_ciphertext(dk: &DecryptionKey, ciphertext: &Ciphertext) -> Result<Str
     Ok(plaintext.to_str_radix(36))
 }
 
-/// Paillier add two ciphertexts
-/// @param string $encryption_key Base 36 encoded string containing the encryption key
-/// @param string $ct1_data Base 36 encoded string of the first operand
-/// @param string $ct2_data Base 36 encoded string of the second operand
-/// @return string The encrypted result of the addition
+/// Add two ciphertexts (homomorphic addition).
+/// @param string $encryption_key The encryption key (base-36 encoded)
+/// @param string $ct1_data First ciphertext (base-36 encoded)
+/// @param string $ct2_data Second ciphertext (base-36 encoded)
+/// @return string The encrypted sum (base-36 encoded)
 #[php_function]
 pub fn pal_add(encryption_key: String, ct1_data: String, ct2_data: String) -> Result<String, String> {
     let ek = validate_encryption_key(encryption_key)?;
@@ -144,10 +144,10 @@ pub fn pal_add(encryption_key: String, ct1_data: String, ct2_data: String) -> Re
     Ok(sum.to_str_radix(36))
 }
 
-/// Paillier add all ciphertexts in an array
-/// @param string $encryption_key Base 36 encoded string containing the encryption key
-/// @param string[] $ciphertext_data Array of ciphertexts to add
-/// @return string The encrypted result of the addition
+/// Sum all ciphertexts in an array (homomorphic addition).
+/// @param string $encryption_key The encryption key (base-36 encoded)
+/// @param string[] $ciphertext_data Ciphertexts to sum (base-36 encoded)
+/// @return string The encrypted total (base-36 encoded)
 #[php_function]
 pub fn pal_add_array(encryption_key: String, ciphertext_data: HashMap<String, String>) -> Result<String, String> {
     let ek = validate_encryption_key(encryption_key)?;
@@ -175,11 +175,11 @@ fn add_ciphertexts(ek: &EncryptionKey, ciphertext1: &Ciphertext, ciphertext2: &C
     Ok(sum)
 }
 
-/// Paillier multiply a ciphertext by a number
-/// @param string $encryption_key Base 36 encoded string containing the encryption key
-/// @param string $ct_data Base 36 encoded string of the ciphertext
-/// @param int $factor number by which to multiply the cipertext
-/// @return string The encrypted result of the multiplication
+/// Multiply a ciphertext by a plaintext scalar (homomorphic scalar multiplication).
+/// @param string $encryption_key The encryption key (base-36 encoded)
+/// @param string $ct_data The ciphertext (base-36 encoded)
+/// @param int $factor The scalar to multiply by
+/// @return string The encrypted product (base-36 encoded)
 #[php_function]
 pub fn pal_multiply(encryption_key: String, ct_data: String, factor: i64) -> Result<String, String> {
     let ek = validate_encryption_key(encryption_key)?;

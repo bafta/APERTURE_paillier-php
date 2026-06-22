@@ -11,6 +11,8 @@ This is useful for privacy-preserving computation -- for example, a server can c
 
 The cryptographic implementation is provided by the [fast-paillier](https://crates.io/crates/fast-paillier) Rust crate (currently using [a fork](https://github.com/bafta/fast-paillier) at v0.3.2 due to an upstream build issue).
 
+This repository is part of the [BFI-funded APERTURE project](https://github.com/bafta/APERTURE).
+
 ## Prerequisites
 
 - **Rust** toolchain (install via [rustup](https://rustup.rs/))
